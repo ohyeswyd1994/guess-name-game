@@ -1,0 +1,16 @@
+{
+  "name": "guess-name-game",
+  "version": "1.0.0",
+  "description": "局域网猜人名小游戏 (额头贴名字玩法)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  }
+}

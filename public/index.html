@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>猜人名 · 局域网版</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg2: #1e293b;
+    --card: #1e293b;
+    --card2: #334155;
+    --primary: #6366f1;
+    --primary2: #818cf8;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: var(--text);
+    overflow-x: hidden;
+  }
+  #app {
+    min-height: 100vh;
+    padding: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  h1, h2, h3 { font-weight: 600; }
+  .title {
+    text-align: center;
+    margin: 12px 0 24px;
+    font-size: 28px;
+    background: linear-gradient(135deg, #818cf8, #f472b6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  }
+  .card h3 {
+    font-size: 16px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  input, button, textarea {
+    font-family: inherit;
+    font-size: 15px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    outline: none;
+    transition: all 0.2s;
+  }
+  input, textarea {
+    background: var(--bg);
+    color: var(--text);
+    padding: 12px 14px;
+    width: 100%;
+  }
+  input:focus, textarea:focus {
+    border-color: var(--primary2);
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
+  }
+  button {
+    background: var(--primary);
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  button:hover:not(:disabled) { background: var(--primary2); transform: translateY(-1px); }
+  button:active:not(:disabled) { transform: translateY(0); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  button.ghost:hover:not(:disabled) { background: var(--card2); }
+  button.success { background: var(--success); }
+  button.success:hover:not(:disabled) { background: #34d399; }
+  button.danger { background: var(--danger); }
+  button.warn { background: var(--warn); color: #1e293b; }
+
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > input { flex: 1; }
+  .grid { display: grid; gap: 8px; }
+  .muted { color: var(--text-dim); font-size: 13px; }
+  .center { text-align: center; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: var(--card2);
+    color: var(--text-dim);
+  }
+  .badge.host { background: #f59e0b; color: #1e293b; font-weight: 600; }
+  .badge.me { background: var(--primary); color: white; }
+  .badge.guessed { background: var(--success); color: white; }
+  .badge.ok { background: var(--success); color: white; }
+  .badge.waiting { background: var(--warn); color: #1e293b; }
+
+  .player-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  .player-row .name { font-weight: 500; }
+  .player-row .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .target-board {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    text-align: center;
+    padding: 28px 20px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 8px 30px rgba(99,102,241,0.3);
+  }
+  .target-board .tip { font-size: 13px; opacity: 0.85; margin-bottom: 8px; }
+  .target-board .target-name { font-size: 32px; font-weight: 700; word-break: break-all; }
+  .target-board.you {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border: 2px dashed var(--primary2);
+  }
+  .target-board.you .target-name { font-size: 24px; color: var(--primary2); }
+
+  .others-list { display: grid; gap: 8px; margin-bottom: 16px; }
+  .other-card {
+    background: var(--card);
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .other-card .who { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
+  .other-card .what { font-size: 18px; font-weight: 600; }
+  .other-card.guessed { opacity: 0.5; }
+  .other-card.guessed .what { text-decoration: line-through; }
+
+  .question-card {
+    background: var(--bg);
+    padding: 14px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--primary2);
+  }
+  .question-card.guess { border-left-color: var(--warn); }
+  .question-card.guess.correct { border-left-color: var(--success); }
+  .question-card.guess.wrong { border-left-color: var(--danger); }
+  .question-card.system { border-left-color: var(--text-dim); font-style: italic; color: var(--text-dim); }
+  .question-card .head {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .question-card .text { font-size: 15px; line-height: 1.5; }
+  .question-card .votes {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+  .question-card .vote-tag {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--card2);
+  }
+  .vote-tag.yes { background: rgba(16,185,129,0.2); color: #34d399; }
+  .vote-tag.no { background: rgba(239,68,68,0.2); color: #f87171; }
+  .vote-tag.maybe { background: rgba(245,158,11,0.2); color: #fbbf24; }
+  .vote-tag.both { background: rgba(139,92,246,0.2); color: #a78bfa; }
+
+  .vote-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .vote-buttons button { flex: 1; padding: 10px; }
+  .vote-buttons .yes { background: var(--success); }
+  .vote-buttons .no { background: var(--danger); }
+  .vote-buttons .maybe { background: var(--warn); color: #1e293b; }
+  .vote-buttons .both { background: #8b5cf6; }
+
+  .quick-questions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .quick-questions .quick-q {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    line-height: 1.2;
+  }
+  .quick-questions .quick-q:hover:not(:disabled) {
+    background: var(--card2);
+    border-color: var(--primary2);
+    color: var(--primary2);
+  }
+
+  .ask-area {
+    background: var(--card);
+    padding: 16px;
+    border-radius: 14px;
+    border: 2px solid var(--primary);
+    margin-bottom: 16px;
+  }
+  .ask-area .label {
+    font-size: 13px;
+    color: var(--primary2);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .history-box {
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .history-box::-webkit-scrollbar { width: 6px; }
+  .history-box::-webkit-scrollbar-thumb { background: var(--card2); border-radius: 3px; }
+
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    z-index: 100;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translate(-50%, -10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  .footer-tip {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-top: 20px;
+    padding-bottom: 20px;
+  }
+
+  .end-banner {
+    background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+    color: white;
+    padding: 24px;
+    border-radius: 16px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .end-banner h2 { font-size: 24px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1 class="title">🎭 猜人名 · 额头贴贴版</h1>
+  <div id="main"></div>
+  <div class="footer-tip">局域网游戏 · 3-6 人 · 房间唯一</div>
+</div>
+
+<script>
+const COMMON_QUESTIONS = [
+  '我这个东西是人吗',
+  '我这个人是魏蜀吴的吗',
+  '我这个人是魏的吗',
+  '我这个人是蜀的吗',
+  '我这个人是吴的吗',
+  '我这个人是上阵 kukuku 的吗',
+];
+
+let ws = null;
+let myId = null;
+let state = null;
+let lastVoteChoice = {}; // questionId -> choice
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}`);
+  ws.onopen = () => { /* 等待用户输入名字加入 */ };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'joined') {
+      myId = msg.youId;
+      try { localStorage.setItem('lastName', currentJoinName || ''); } catch {}
+    } else if (msg.type === 'state') {
+      state = msg.state;
+      render();
+    } else if (msg.type === 'error') {
+      showToast(msg.message);
+    }
+  };
+  ws.onclose = () => {
+    showToast('与服务器断开连接，3 秒后重连…');
+    setTimeout(() => location.reload(), 3000);
+  };
+}
+
+function send(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+let currentJoinName = '';
+
+function renderJoin() {
+  const lastName = localStorage.getItem('lastName') || '';
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <h3>👋 输入你的昵称加入房间</h3>
+      <div class="row">
+        <input id="nameInput" maxlength="16" placeholder="昵称（最多 16 字）" value="${escapeHtml(lastName)}" />
+        <button id="joinBtn">加入</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">进入后还可以随时改名 · 房间最多 6 人</p>
+    </div>
+  `;
+  const input = document.getElementById('nameInput');
+  input.focus();
+  input.select();
+  const join = () => {
+    const name = input.value.trim();
+    if (!name) { showToast('请输入昵称'); return; }
+    currentJoinName = name;
+    send({ type: 'join', name });
+  };
+  document.getElementById('joinBtn').onclick = join;
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function render() {
+  if (!myId || !state) return;
+  if (state.phase === 'lobby') return renderLobby();
+  if (state.phase === 'assigning') return renderAssigning();
+  if (state.phase === 'playing') return renderPlaying();
+  if (state.phase === 'ended') return renderEnded();
+}
+
+function playerListHtml() {
+  return `
+    <div class="grid">
+      ${state.players.map(p => `
+        <div class="player-row">
+          <span class="name">${escapeHtml(p.name)}</span>
+          <span class="tags">
+            ${p.id === myId ? '<span class="badge me">你</span>' : ''}
+            ${p.isHost ? '<span class="badge host">房主</span>' : ''}
+            ${p.guessed ? '<span class="badge guessed">已猜中 · 观战</span>' : ''}
+            ${state.phase === 'assigning' ? (p.submittedTarget ? '<span class="badge ok">已就位</span>' : '<span class="badge waiting">待出题</span>') : ''}
+          </span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderLobby() {
+  const me = state.players.find(p => p.id === myId);
+  const isHost = me && me.isHost;
+  const canStart = state.players.length >= state.minPlayers;
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <h3>🛋️ 大厅 · 当前 ${state.players.length}/${state.maxPlayers} 人</h3>
+      ${playerListHtml()}
+    </div>
+
+    <div class="card">
+      <h3>✏️ 修改我的昵称</h3>
+      <div class="row">
+        <input id="renameInput" maxlength="16" value="${escapeHtml(me ? me.name : '')}" />
+        <button id="renameBtn" class="ghost">保存</button>
+      </div>
+    </div>
+
+    ${isHost ? `
+      <div class="card">
+        <h3>🎮 准备开始</h3>
+        <p class="muted" style="margin-bottom:12px;">至少需要 ${state.minPlayers} 人才能开始。开始后系统会随机配对，每个人给"被分配到的人"输入一个人名贴在他/她的额头上。</p>
+        <button id="startBtn" ${canStart ? '' : 'disabled'}>${canStart ? '开始游戏' : `还差 ${state.minPlayers - state.players.length} 人`}</button>
+      </div>
+    ` : `
+      <div class="card center">
+        <p class="muted">⏳ 等待房主开始游戏…</p>
+      </div>
+    `}
+  `;
+  document.getElementById('renameBtn').onclick = () => {
+    const name = document.getElementById('renameInput').value.trim();
+    if (!name) return;
+    send({ type: 'rename', name });
+    showToast('已改名');
+  };
+  if (isHost) {
+    document.getElementById('startBtn').onclick = () => {
+      send({ type: 'startGame' });
+    };
+  }
+}
+
+function renderAssigning() {
+  const myPlayer = state.players.find(p => p.id === myId);
+  const assignee = state.yourAssignee;
+  const submitted = assignee && assignee.submitted;
+
+  document.getElementById('main').innerHTML = `
+    <div class="card">
+      <h3>📝 出题阶段</h3>
+      <p class="muted">每个人会给随机分配到的另一位玩家输入一个"贴在他额头上的人名"。所有人都提交后游戏开始。</p>
+    </div>
+
+    ${assignee ? `
+      <div class="card" style="border:2px solid var(--primary);">
+        <h3>🎯 请给 <span style="color:var(--primary2); font-weight:600;">${escapeHtml(assignee.name)}</span> 出题</h3>
+        ${submitted ? `
+          <p style="color:var(--success); margin:12px 0;">✅ 你已经为 ${escapeHtml(assignee.name)} 出好题啦，等其他人就位…</p>
+        ` : `
+          <div class="row" style="margin-top:8px;">
+            <input id="targetInput" maxlength="32" placeholder="输入一个人名（真实/虚构都行）" />
+            <button id="submitTargetBtn">提交</button>
+          </div>
+          <p class="muted" style="margin-top:8px;">⚠️ 提交后无法修改，悄悄输入别让 ${escapeHtml(assignee.name)} 看到</p>
+        `}
+      </div>
+    ` : ''}
+
+    <div class="card">
+      <h3>👥 玩家就位情况</h3>
+      ${playerListHtml()}
+    </div>
+  `;
+
+  if (assignee && !submitted) {
+    const inp = document.getElementById('targetInput');
+    inp.focus();
+    const submit = () => {
+      const target = inp.value.trim();
+      if (!target) { showToast('请输入人名'); return; }
+      send({ type: 'submitTarget', target });
+    };
+    document.getElementById('submitTargetBtn').onclick = submit;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  }
+}
+
+function renderPlaying() {
+  const me = state.players.find(p => p.id === myId);
+  const askerId = state.askerId;
+  const asker = state.players.find(p => p.id === askerId);
+  const isMyTurn = askerId === myId && me && !me.guessed;
+  const turnAsked = !!state.turnAsked;
+  const lastQ = [...state.history].reverse().find(h => h.kind === 'question');
+  // 当前回合的最后一个问题（用于其他人投票）—— 必须是当前提问者发的，且本回合内的
+  const currentTurnQ = lastQ && lastQ.askerId === askerId ? lastQ : null;
+
+  document.getElementById('main').innerHTML = `
+    ${me && me.guessed ? `
+      <div class="target-board you">
+        <div class="tip">🎉 你已经猜中啦，现在是观战 + 帮别人回答问题</div>
+        <div class="target-name">${escapeHtml(me.target || '')}</div>
+      </div>
+    ` : `
+      <div class="target-board">
+        <div class="tip">🎯 你额头上贴的是谁？通过提问来猜！</div>
+        <div class="target-name">？？？</div>
+      </div>
+    `}
+
+    <div class="card">
+      <h3>👀 别人额头上贴的是…（你能看见）</h3>
+      <div class="others-list">
+        ${state.viewTargets.map(p => `
+          <div class="other-card ${p.guessed ? 'guessed' : ''}">
+            <div>
+              <div class="who">${escapeHtml(p.name)}${p.guessed ? ' · 已猜中' : ''}</div>
+              <div class="what">${escapeHtml(p.target || '')}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="ask-area">
+      <div class="label">
+        ${isMyTurn
+          ? (turnAsked
+              ? '👉 你的回合 · 你已经问过了，现在请选择「猜」或「跳过」'
+              : '👉 你的回合 · 请提一个问题（每回合只能问 1 次）')
+          : `⌛ 当前轮到 <b>${asker ? escapeHtml(asker.name) : '—'}</b> 提问${turnAsked ? '（已问过，等他/她决定是否猜测）' : ''}`}
+      </div>
+      ${isMyTurn ? `
+        <div class="row" style="margin-top:8px;">
+          <input id="askInput" maxlength="200" placeholder="${turnAsked ? '本回合已经问过了' : '自己输入问题，或点下方常用问题'}" ${turnAsked ? 'disabled' : ''} />
+          <button id="askBtn" ${turnAsked ? 'disabled' : ''}>提问</button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div class="muted" style="margin-bottom:6px;font-size:12px;">⚡ 常用问题（点一下直接发送）</div>
+          <div class="quick-questions">
+            ${COMMON_QUESTIONS.map((q, i) => `
+              <button class="quick-q" data-quick="${i}" ${turnAsked ? 'disabled' : ''}>${escapeHtml(q)}</button>
+            `).join('')}
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border); margin:14px 0 10px;"></div>
+
+        <div class="muted" style="margin-bottom:8px;">${turnAsked ? '🎲 决定一下：' : '⚠️ 必须先问一个问题，才能选择猜测或跳过'}</div>
+        <div class="row" style="gap:8px;">
+          <input id="guessInput" maxlength="32" placeholder="${turnAsked ? '输入你认为自己额头上的人名' : '先提问后才能猜'}" ${turnAsked ? '' : 'disabled'} />
+          <button id="guessBtn" class="success" ${turnAsked ? '' : 'disabled'}>猜！</button>
+        </div>
+        <button id="nextBtn" class="ghost" style="margin-top:10px;width:100%;" ${turnAsked ? '' : 'disabled'}>不猜了，跳过本回合 →</button>
+        ${turnAsked ? `<p class="muted" style="margin-top:8px;font-size:12px;">⚠️ 猜错的话本回合会立刻结束哦</p>` : ''}
+      ` : ''}
+      ${!isMyTurn && currentTurnQ ? renderVoteUI(currentTurnQ, me) : ''}
+    </div>
+
+    <div class="card">
+      <h3>📜 历史记录</h3>
+      <div class="history-box" id="historyBox">
+        ${[...state.history].reverse().map(h => renderHistoryItem(h)).join('') || '<p class="muted">暂无</p>'}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>👥 玩家</h3>
+      ${playerListHtml()}
+    </div>
+  `;
+
+  if (isMyTurn) {
+    const inp = document.getElementById('askInput');
+    if (inp && !inp.disabled) {
+      inp.focus();
+      const ask = () => {
+        const text = inp.value.trim();
+        if (!text) { showToast('请输入问题'); return; }
+        send({ type: 'ask', text });
+        inp.value = '';
+      };
+      const askBtn = document.getElementById('askBtn');
+      if (askBtn && !askBtn.disabled) askBtn.onclick = ask;
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+    }
+    // 快捷问题
+    if (!turnAsked) {
+      document.querySelectorAll('[data-quick]').forEach(btn => {
+        btn.onclick = () => {
+          const i = +btn.getAttribute('data-quick');
+          const text = COMMON_QUESTIONS[i];
+          if (!text) return;
+          send({ type: 'ask', text });
+        };
+      });
+    }
+    const nextBtn = document.getElementById('nextBtn');
+    if (nextBtn && !nextBtn.disabled) nextBtn.onclick = () => {
+      if (!confirm('确定本回合不猜，跳过吗？')) return;
+      send({ type: 'nextAsker' });
+    };
+
+    const gi = document.getElementById('guessInput');
+    if (gi && !gi.disabled) {
+      const guess = () => {
+        const v = gi.value.trim();
+        if (!v) { showToast('请输入猜测'); return; }
+        if (!confirm(`确定要猜 "${v}" 吗？\n\n⚠️ 注意：猜错的话本回合会立刻结束！`)) return;
+        send({ type: 'guess', guess: v });
+        gi.value = '';
+      };
+      document.getElementById('guessBtn').onclick = guess;
+      gi.addEventListener('keydown', e => { if (e.key === 'Enter') guess(); });
+    }
+  }
+
+  // 投票绑定
+  document.querySelectorAll('[data-vote]').forEach(btn => {
+    btn.onclick = () => {
+      const choice = btn.getAttribute('data-vote');
+      const qid = btn.getAttribute('data-qid');
+      send({ type: 'vote', choice, questionId: qid });
+    };
+  });
+}
+
+function renderVoteUI(q, me) {
+  if (!me) return '';
+  const myVote = ['yes','no','maybe','both'].find(k => q.votes[k].includes(myId));
+  return `
+    <div style="margin-top:10px;">
+      <div class="muted" style="margin-bottom:6px;">${escapeHtml(q.askerName)} 问：</div>
+      <div style="font-size:16px; padding:10px; background:var(--bg); border-radius:8px;">${escapeHtml(q.text)}</div>
+      <div class="vote-buttons">
+        <button class="yes" data-vote="yes" data-qid="${q.questionId}" ${myVote==='yes'?'style="outline:3px solid white;"':''}>✅ 是</button>
+        <button class="no" data-vote="no" data-qid="${q.questionId}" ${myVote==='no'?'style="outline:3px solid white;"':''}>❌ 否</button>
+        <button class="both" data-vote="both" data-qid="${q.questionId}" ${myVote==='both'?'style="outline:3px solid white;"':''}>🌗 是也不是</button>
+        <button class="maybe" data-vote="maybe" data-qid="${q.questionId}" ${myVote==='maybe'?'style="outline:3px solid #1e293b;"':''}>🤷 不确定</button>
+      </div>
+      <div class="muted" style="margin-top:6px;font-size:12px;">${voteSummary(q)}</div>
+    </div>
+  `;
+}
+
+function voteSummary(q) {
+  const y = q.votes.yes.length, n = q.votes.no.length, b = (q.votes.both || []).length, m = q.votes.maybe.length;
+  return `当前投票 · ✅ ${y} · ❌ ${n} · 🌗 ${b} · 🤷 ${m}`;
+}
+
+function renderHistoryItem(h) {
+  if (h.kind === 'question') {
+    const yesNames = h.votes.yes.map(id => nameOf(id)).join('、') || '—';
+    const noNames = h.votes.no.map(id => nameOf(id)).join('、') || '—';
+    const bothVotes = h.votes.both || [];
+    const bothNames = bothVotes.map(id => nameOf(id)).join('、') || '—';
+    const maybeNames = h.votes.maybe.map(id => nameOf(id)).join('、') || '—';
+    return `
+      <div class="question-card">
+        <div class="head">
+          <span><b>${escapeHtml(h.askerName)}</b> 提问</span>
+          <span>${formatTime(h.time)}</span>
+        </div>
+        <div class="text">${escapeHtml(h.text)}</div>
+        <div class="votes">
+          <span class="vote-tag yes">✅ ${h.votes.yes.length} (${escapeHtml(yesNames)})</span>
+          <span class="vote-tag no">❌ ${h.votes.no.length} (${escapeHtml(noNames)})</span>
+          <span class="vote-tag both">🌗 ${bothVotes.length} (${escapeHtml(bothNames)})</span>
+          <span class="vote-tag maybe">🤷 ${h.votes.maybe.length} (${escapeHtml(maybeNames)})</span>
+        </div>
+      </div>
+    `;
+  }
+  if (h.kind === 'guess') {
+    return `
+      <div class="question-card guess ${h.correct ? 'correct' : 'wrong'}">
+        <div class="head">
+          <span><b>${escapeHtml(h.playerName)}</b> ${h.correct ? '猜中啦 🎉' : '猜错了 😅'}</span>
+          <span>${formatTime(h.time)}</span>
+        </div>
+        <div class="text">猜测：${escapeHtml(h.guess)}${h.correct ? `（正确答案：${escapeHtml(h.target || '')}）` : ''}</div>
+      </div>
+    `;
+  }
+  if (h.kind === 'system') {
+    return `<div class="question-card system"><div class="text">${escapeHtml(h.text)}</div></div>`;
+  }
+  return '';
+}
+
+function nameOf(id) {
+  const p = state.players.find(p => p.id === id);
+  return p ? p.name : '？';
+}
+
+function formatTime(t) {
+  const d = new Date(t);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
+function renderEnded() {
+  const me = state.players.find(p => p.id === myId);
+  const isHost = me && me.isHost;
+  document.getElementById('main').innerHTML = `
+    <div class="end-banner">
+      <h2>🎊 本局结束！</h2>
+      <p>所有人都猜中啦，看看大家的成绩 ↓</p>
+    </div>
+
+    <div class="card">
+      <h3>📋 结果</h3>
+      <div class="grid">
+        ${state.players.map(p => `
+          <div class="player-row">
+            <span class="name">${escapeHtml(p.name)}${p.id === myId ? ' (你)' : ''}</span>
+            <span class="tags">
+              <span class="badge">额头：${escapeHtml(p.id === myId ? (state.yourTarget || '') : (state.viewTargets.find(v=>v.id===p.id)?.target || ''))}</span>
+              ${p.guessed ? '<span class="badge guessed">猜中</span>' : '<span class="badge">未猜中</span>'}
+            </span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📜 全场记录</h3>
+      <div class="history-box">
+        ${[...state.history].reverse().map(h => renderHistoryItem(h)).join('') || '<p class="muted">暂无</p>'}
+      </div>
+    </div>
+
+    ${isHost ? `
+      <div class="card center">
+        <button id="restartBtn" class="success">🔄 再来一局</button>
+      </div>
+    ` : `
+      <div class="card center">
+        <p class="muted">⏳ 等待房主开始下一局…</p>
+      </div>
+    `}
+  `;
+  if (isHost) {
+    document.getElementById('restartBtn').onclick = () => send({ type: 'restart' });
+  }
+}
+
+renderJoin();
+connect();
+</script>
+</body>
+</html>

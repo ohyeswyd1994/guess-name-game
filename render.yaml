@@ -1,0 +1,10 @@
+# Render 部署配置
+# 文档：https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: guess-name-game
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    autoDeploy: true
