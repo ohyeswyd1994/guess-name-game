@@ -127,7 +127,37 @@
     margin-bottom: 6px;
   }
   .player-row .name { font-weight: 500; }
-  .player-row .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .player-row .tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .player-row.spectator { opacity: 0.7; }
+  .badge.spectator { background: #6b7280; color: white; }
+
+  .kick-btn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 2px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .kick-btn:hover {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+  }
+
+  .host-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .host-actions button {
+    flex: 1;
+    min-width: 120px;
+    font-size: 13px;
+    padding: 8px 12px;
+  }
 
   .target-board {
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
@@ -309,6 +339,7 @@ let ws = null;
 let myId = null;
 let state = null;
 let lastVoteChoice = {}; // questionId -> choice
+let kickedReason = null; // 被踢/解散后展示用
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -324,9 +355,27 @@ function connect() {
       render();
     } else if (msg.type === 'error') {
       showToast(msg.message);
+    } else if (msg.type === 'info') {
+      showToast(msg.message, 4500);
+    } else if (msg.type === 'kicked') {
+      kickedReason = msg.message || '你被移出了房间';
+      // 服务端会主动 close 连接
+    } else if (msg.type === 'disbanded') {
+      kickedReason = msg.message || '房间已解散';
     }
   };
   ws.onclose = () => {
+    if (kickedReason) {
+      // 显示离开提示页面，不自动重连
+      document.getElementById('main').innerHTML = `
+        <div class="card center">
+          <h3 style="margin-bottom:12px;">👋 ${escapeHtml(kickedReason)}</h3>
+          <p class="muted" style="margin-bottom:16px;">如想重新加入，请刷新页面</p>
+          <button onclick="location.reload()">刷新页面重新加入</button>
+        </div>
+      `;
+      return;
+    }
     showToast('与服务器断开连接，3 秒后重连…');
     setTimeout(() => location.reload(), 3000);
   };
@@ -336,12 +385,12 @@ function send(obj) {
   if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
 }
 
-function showToast(msg) {
+function showToast(msg, duration) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2500);
+  setTimeout(() => t.remove(), duration || 2500);
 }
 
 let currentJoinName = '';
@@ -384,16 +433,19 @@ function render() {
 }
 
 function playerListHtml() {
+  const meIsHost = state.players.find(p => p.id === myId && p.isHost);
   return `
     <div class="grid">
       ${state.players.map(p => `
-        <div class="player-row">
+        <div class="player-row ${p.isSpectator ? 'spectator' : ''}">
           <span class="name">${escapeHtml(p.name)}</span>
           <span class="tags">
             ${p.id === myId ? '<span class="badge me">你</span>' : ''}
             ${p.isHost ? '<span class="badge host">房主</span>' : ''}
+            ${p.isSpectator ? '<span class="badge spectator">观众</span>' : ''}
             ${p.guessed ? '<span class="badge guessed">已猜中 · 观战</span>' : ''}
-            ${state.phase === 'assigning' ? (p.submittedTarget ? '<span class="badge ok">已就位</span>' : '<span class="badge waiting">待出题</span>') : ''}
+            ${state.phase === 'assigning' && !p.isSpectator ? (p.submittedTarget ? '<span class="badge ok">已就位</span>' : '<span class="badge waiting">待出题</span>') : ''}
+            ${meIsHost && p.id !== myId ? `<button class="kick-btn" data-kick="${p.id}" data-name="${escapeHtml(p.name)}" title="踢出该玩家">踢</button>` : ''}
           </span>
         </div>
       `).join('')}
@@ -401,13 +453,27 @@ function playerListHtml() {
   `;
 }
 
+// 在每次 render 后绑定踢人按钮（防止重复 onclick）
+function bindKickButtons() {
+  document.querySelectorAll('[data-kick]').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.getAttribute('data-kick');
+      const name = btn.getAttribute('data-name');
+      if (!confirm(`确定要把 ${name} 踢出房间吗？\n\n${state.phase !== 'lobby' ? '⚠️ 游戏进行中踢人会导致本局结束！' : ''}`)) return;
+      send({ type: 'kick', targetId: id });
+    };
+  });
+}
+
 function renderLobby() {
   const me = state.players.find(p => p.id === myId);
   const isHost = me && me.isHost;
-  const canStart = state.players.length >= state.minPlayers;
+  // 大厅里所有人都是正式玩家（观众会被转正）；这里直接用 players.length
+  const activeCount = state.players.length;
+  const canStart = activeCount >= state.minPlayers && activeCount <= state.maxPlayers;
   document.getElementById('main').innerHTML = `
     <div class="card">
-      <h3>🛋️ 大厅 · 当前 ${state.players.length}/${state.maxPlayers} 人</h3>
+      <h3>🛋️ 大厅 · 当前 ${activeCount}/${state.maxPlayers} 人</h3>
       ${playerListHtml()}
     </div>
 
@@ -423,7 +489,10 @@ function renderLobby() {
       <div class="card">
         <h3>🎮 准备开始</h3>
         <p class="muted" style="margin-bottom:12px;">至少需要 ${state.minPlayers} 人才能开始。开始后系统会随机配对，每个人给"被分配到的人"输入一个人名贴在他/她的额头上。</p>
-        <button id="startBtn" ${canStart ? '' : 'disabled'}>${canStart ? '开始游戏' : `还差 ${state.minPlayers - state.players.length} 人`}</button>
+        <button id="startBtn" ${canStart ? '' : 'disabled'}>${canStart ? '开始游戏' : (activeCount < state.minPlayers ? `还差 ${state.minPlayers - activeCount} 人` : '人数已满')}</button>
+        <div class="host-actions">
+          <button id="disbandBtn" class="ghost">🚪 解散房间</button>
+        </div>
       </div>
     ` : `
       <div class="card center">
@@ -441,15 +510,30 @@ function renderLobby() {
     document.getElementById('startBtn').onclick = () => {
       send({ type: 'startGame' });
     };
+    const dBtn = document.getElementById('disbandBtn');
+    if (dBtn) dBtn.onclick = () => {
+      if (!confirm('确定要解散房间吗？\n\n所有人都会被踢回输入昵称页面。')) return;
+      send({ type: 'disband' });
+    };
   }
+  bindKickButtons();
 }
 
 function renderAssigning() {
   const myPlayer = state.players.find(p => p.id === myId);
+  const isHost = myPlayer && myPlayer.isHost;
+  const youAreSpectator = !!state.youAreSpectator;
   const assignee = state.yourAssignee;
   const submitted = assignee && assignee.submitted;
 
   document.getElementById('main').innerHTML = `
+    ${youAreSpectator ? `
+      <div class="card" style="border:2px dashed #6b7280;">
+        <h3>🎬 你是观众</h3>
+        <p class="muted">游戏开始时你正好不在，所以这局以观众身份围观。下一局开始时会自动加入正式玩家！</p>
+      </div>
+    ` : ''}
+
     <div class="card">
       <h3>📝 出题阶段</h3>
       <p class="muted">每个人会给随机分配到的另一位玩家输入一个"贴在他额头上的人名"。所有人都提交后游戏开始。</p>
@@ -473,6 +557,12 @@ function renderAssigning() {
     <div class="card">
       <h3>👥 玩家就位情况</h3>
       ${playerListHtml()}
+      ${isHost ? `
+        <div class="host-actions">
+          <button id="backLobbyBtn" class="ghost">↩️ 结束本局回大厅</button>
+          <button id="disbandBtn" class="ghost">🚪 解散房间</button>
+        </div>
+      ` : ''}
     </div>
   `;
 
@@ -487,20 +577,43 @@ function renderAssigning() {
     document.getElementById('submitTargetBtn').onclick = submit;
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
   }
+  if (isHost) bindHostActions();
+  bindKickButtons();
+}
+
+// 通用：绑定房主的"结束本局回大厅"和"解散房间"按钮
+function bindHostActions() {
+  const back = document.getElementById('backLobbyBtn');
+  if (back) back.onclick = () => {
+    if (!confirm('确定结束本局回到大厅吗？')) return;
+    send({ type: 'backToLobby' });
+  };
+  const dis = document.getElementById('disbandBtn');
+  if (dis) dis.onclick = () => {
+    if (!confirm('确定解散房间吗？\n\n所有人都会被踢回输入昵称页面。')) return;
+    send({ type: 'disband' });
+  };
 }
 
 function renderPlaying() {
   const me = state.players.find(p => p.id === myId);
+  const isHost = me && me.isHost;
+  const youAreSpectator = !!state.youAreSpectator;
   const askerId = state.askerId;
   const asker = state.players.find(p => p.id === askerId);
-  const isMyTurn = askerId === myId && me && !me.guessed;
+  const isMyTurn = !youAreSpectator && askerId === myId && me && !me.guessed;
   const turnAsked = !!state.turnAsked;
   const lastQ = [...state.history].reverse().find(h => h.kind === 'question');
   // 当前回合的最后一个问题（用于其他人投票）—— 必须是当前提问者发的，且本回合内的
   const currentTurnQ = lastQ && lastQ.askerId === askerId ? lastQ : null;
 
   document.getElementById('main').innerHTML = `
-    ${me && me.guessed ? `
+    ${youAreSpectator ? `
+      <div class="card" style="border:2px dashed #6b7280;">
+        <h3>🎬 你正在围观</h3>
+        <p class="muted">游戏开始时你不在，所以这局以观众身份观看。下一局开始时会自动加入正式玩家！</p>
+      </div>
+    ` : (me && me.guessed ? `
       <div class="target-board you">
         <div class="tip">🎉 你已经猜中啦，现在是观战 + 帮别人回答问题</div>
         <div class="target-name">${escapeHtml(me.target || '')}</div>
@@ -510,10 +623,10 @@ function renderPlaying() {
         <div class="tip">🎯 你额头上贴的是谁？通过提问来猜！</div>
         <div class="target-name">？？？</div>
       </div>
-    `}
+    `)}
 
     <div class="card">
-      <h3>👀 别人额头上贴的是…（你能看见）</h3>
+      <h3>👀 ${youAreSpectator ? '所有玩家额头上贴的是…' : '别人额头上贴的是…（你能看见）'}</h3>
       <div class="others-list">
         ${state.viewTargets.map(p => `
           <div class="other-card ${p.guessed ? 'guessed' : ''}">
@@ -559,7 +672,14 @@ function renderPlaying() {
         <button id="nextBtn" class="ghost" style="margin-top:10px;width:100%;" ${turnAsked ? '' : 'disabled'}>不猜了，跳过本回合 →</button>
         ${turnAsked ? `<p class="muted" style="margin-top:8px;font-size:12px;">⚠️ 猜错的话本回合会立刻结束哦</p>` : ''}
       ` : ''}
-      ${!isMyTurn && currentTurnQ ? renderVoteUI(currentTurnQ, me) : ''}
+      ${!isMyTurn && !youAreSpectator && currentTurnQ ? renderVoteUI(currentTurnQ, me) : ''}
+      ${youAreSpectator && currentTurnQ ? `
+        <div style="margin-top:10px;">
+          <div class="muted" style="margin-bottom:6px;">${escapeHtml(currentTurnQ.askerName)} 问：</div>
+          <div style="font-size:16px; padding:10px; background:var(--bg); border-radius:8px;">${escapeHtml(currentTurnQ.text)}</div>
+          <div class="muted" style="margin-top:6px;font-size:12px;">${voteSummary(currentTurnQ)} · 观众无法参与投票</div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="card">
@@ -572,6 +692,12 @@ function renderPlaying() {
     <div class="card">
       <h3>👥 玩家</h3>
       ${playerListHtml()}
+      ${isHost ? `
+        <div class="host-actions">
+          <button id="backLobbyBtn" class="ghost">↩️ 结束本局回大厅</button>
+          <button id="disbandBtn" class="ghost">🚪 解散房间</button>
+        </div>
+      ` : ''}
     </div>
   `;
 
@@ -628,6 +754,9 @@ function renderPlaying() {
       send({ type: 'vote', choice, questionId: qid });
     };
   });
+
+  if (isHost) bindHostActions();
+  bindKickButtons();
 }
 
 function renderVoteUI(q, me) {
@@ -706,16 +835,17 @@ function formatTime(t) {
 function renderEnded() {
   const me = state.players.find(p => p.id === myId);
   const isHost = me && me.isHost;
+  const youAreSpectator = !!state.youAreSpectator;
   document.getElementById('main').innerHTML = `
     <div class="end-banner">
       <h2>🎊 本局结束！</h2>
-      <p>所有人都猜中啦，看看大家的成绩 ↓</p>
+      <p>${youAreSpectator ? '看看正式玩家这局的成绩 ↓' : '所有人都猜中啦，看看大家的成绩 ↓'}</p>
     </div>
 
     <div class="card">
       <h3>📋 结果</h3>
       <div class="grid">
-        ${state.players.map(p => `
+        ${state.players.filter(p => !p.isSpectator).map(p => `
           <div class="player-row">
             <span class="name">${escapeHtml(p.name)}${p.id === myId ? ' (你)' : ''}</span>
             <span class="tags">
@@ -725,6 +855,9 @@ function renderEnded() {
           </div>
         `).join('')}
       </div>
+      ${state.players.some(p => p.isSpectator) ? `
+        <p class="muted" style="margin-top:10px;font-size:12px;">观众：${state.players.filter(p => p.isSpectator).map(p => escapeHtml(p.name)).join('、')}</p>
+      ` : ''}
     </div>
 
     <div class="card">
@@ -737,6 +870,9 @@ function renderEnded() {
     ${isHost ? `
       <div class="card center">
         <button id="restartBtn" class="success">🔄 再来一局</button>
+        <div class="host-actions">
+          <button id="disbandBtn" class="ghost">🚪 解散房间</button>
+        </div>
       </div>
     ` : `
       <div class="card center">
@@ -746,6 +882,7 @@ function renderEnded() {
   `;
   if (isHost) {
     document.getElementById('restartBtn').onclick = () => send({ type: 'restart' });
+    bindHostActions();
   }
 }
 

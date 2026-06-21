@@ -58,6 +58,7 @@ function publicState() {
       id: p.id,
       name: p.name,
       isHost: p.id === room.hostId,
+      isSpectator: !!p.isSpectator,
       alive: p.alive,
       guessed: p.guessed,
       submittedTarget: room.phase === 'assigning' ? !!getSubmittedTargetFor(p.id) : undefined,
@@ -92,21 +93,23 @@ function pushStateToAll() {
       ...base,
       youId: p.id,
       yourName: p.name,
+      youAreSpectator: !!p.isSpectator,
       // 游戏阶段：你能看到别人的 target，看不到自己的
+      // 观众也能看到所有正式玩家的 target（旁观体验）
       viewTargets: room.phase === 'playing' || room.phase === 'ended'
         ? [...room.players.values()]
-            .filter(q => q.id !== p.id)
+            .filter(q => q.id !== p.id && !q.isSpectator)
             .map(q => ({ id: q.id, name: q.name, target: q.target, guessed: q.guessed }))
         : [],
-      // 出题阶段：你需要给谁出题
-      yourAssignee: room.phase === 'assigning'
+      // 出题阶段：你需要给谁出题（观众没有 assignee）
+      yourAssignee: room.phase === 'assigning' && !p.isSpectator
         ? (() => {
             const a = getAssigneeOf(p.id);
             return a ? { id: a.id, name: a.name, submitted: !!a.target } : null;
           })()
         : null,
-      // 游戏结束阶段：把自己的 target 也展示出来
-      yourTarget: room.phase === 'ended' ? p.target : undefined,
+      // 游戏结束阶段：把自己的 target 也展示出来（观众没有）
+      yourTarget: (room.phase === 'ended' && !p.isSpectator) ? p.target : undefined,
     };
     if (p.ws.readyState === 1) p.ws.send(JSON.stringify({ type: 'state', state: personal }));
   }
@@ -141,7 +144,12 @@ function buildDerangement(ids) {
 
 function startAssigning() {
   if (room.phase !== 'lobby') return;
-  const ids = [...room.players.keys()];
+  // 把所有人都转成正式玩家（包括上局结束后还在的观众）
+  for (const p of room.players.values()) {
+    if (room.players.size <= MAX_PLAYERS) p.isSpectator = false;
+  }
+  // 只取正式玩家（非观众）参与
+  const ids = [...room.players.values()].filter(p => !p.isSpectator).map(p => p.id);
   if (ids.length < MIN_PLAYERS) return;
   const pairs = buildDerangement(ids);
   if (!pairs) return;
@@ -163,12 +171,14 @@ function startAssigning() {
 }
 
 function tryStartPlaying() {
-  // 所有人都已被出题
+  // 所有正式玩家都已被出题
   for (const p of room.players.values()) {
+    if (p.isSpectator) continue;
     if (!p.target) return false;
   }
   room.phase = 'playing';
-  room.askerOrder = shuffle([...room.players.keys()]);
+  // 提问顺序只包含正式玩家
+  room.askerOrder = shuffle([...room.players.values()].filter(p => !p.isSpectator).map(p => p.id));
   room.currentAskerIdx = 0;
   room.turnAsked = false;
   pushStateToAll();
@@ -205,22 +215,34 @@ wss.on('connection', (ws) => {
 
     switch (msg.type) {
       case 'join': {
-        if (room.phase !== 'lobby') {
-          ws.send(JSON.stringify({ type: 'error', message: '游戏已开始，无法加入' }));
-          return;
-        }
-        if (room.players.size >= MAX_PLAYERS) {
+        // 大厅：直接当正式玩家加入（受 MAX_PLAYERS 限制）
+        // 游戏中：自动变观众（只受总连接数限制，不计入 MAX_PLAYERS 玩家上限）
+        const inLobby = room.phase === 'lobby';
+        const activeCount = [...room.players.values()].filter(p => !p.isSpectator).length;
+        if (inLobby && activeCount >= MAX_PLAYERS) {
           ws.send(JSON.stringify({ type: 'error', message: '房间已满' }));
           return;
+        }
+        // 观众数量也限制一下，避免无限堆积
+        if (!inLobby) {
+          const specCount = [...room.players.values()].filter(p => p.isSpectator).length;
+          if (specCount >= 10) {
+            ws.send(JSON.stringify({ type: 'error', message: '观众席已满，请稍后再来' }));
+            return;
+          }
         }
         myId = genId();
         const name = (msg.name || '').toString().trim().slice(0, 16) || `玩家${room.players.size + 1}`;
         room.players.set(myId, {
           id: myId, name, ws,
           alive: true, target: null, guessed: false, assigneeId: null,
+          isSpectator: !inLobby, // 游戏中加入 = 观众
         });
         if (!room.hostId) room.hostId = myId;
         ws.send(JSON.stringify({ type: 'joined', youId: myId }));
+        if (!inLobby) {
+          sendTo(myId, { type: 'info', message: '游戏正在进行中，你以观众身份加入。下一局开始时会自动加入正式玩家。' });
+        }
         pushStateToAll();
         break;
       }
@@ -236,6 +258,91 @@ wss.on('connection', (ws) => {
       case 'startGame': {
         if (myId !== room.hostId) return;
         startAssigning();
+        break;
+      }
+      case 'kick': {
+        // 房主踢人（任何阶段都可以）
+        if (myId !== room.hostId) return;
+        const targetId = (msg.targetId || '').toString();
+        if (!targetId || targetId === myId) return;
+        const target = room.players.get(targetId);
+        if (!target) return;
+        const targetName = target.name;
+        // 通知被踢者
+        try {
+          target.ws.send(JSON.stringify({ type: 'kicked', message: '你被房主移出了房间' }));
+        } catch {}
+        // 关闭其连接（close 处理里会自动删除并触发 phase 重置）
+        try { target.ws.close(); } catch {}
+        // 同时也立刻从 players 中移除（防止 close 异步延迟）
+        room.players.delete(targetId);
+        // 游戏中踢人 -> 本局结束回大厅
+        if (room.phase !== 'lobby') {
+          room.phase = 'lobby';
+          room.askerOrder = [];
+          room.currentAskerIdx = 0;
+          room.turnAsked = false;
+          for (const p of room.players.values()) {
+            p.target = null;
+            p.guessed = false;
+            p.alive = true;
+            p.assigneeId = null;
+            p.isSpectator = false; // 上局观众也转正
+          }
+          room.history.push({
+            kind: 'system',
+            text: `房主把 ${targetName} 移出了房间，本局结束，回到大厅`,
+            time: Date.now(),
+          });
+        } else {
+          room.history.push({
+            kind: 'system',
+            text: `房主把 ${targetName} 移出了房间`,
+            time: Date.now(),
+          });
+        }
+        pushStateToAll();
+        break;
+      }
+      case 'disband': {
+        // 房主解散：把所有人踢回各自的"输入昵称"页面
+        if (myId !== room.hostId) return;
+        const broadcastMsg = JSON.stringify({ type: 'disbanded', message: '房主解散了房间' });
+        for (const p of [...room.players.values()]) {
+          try { p.ws.send(broadcastMsg); } catch {}
+          try { p.ws.close(); } catch {}
+        }
+        room.players.clear();
+        room.phase = 'lobby';
+        room.hostId = null;
+        room.askerOrder = [];
+        room.currentAskerIdx = 0;
+        room.turnAsked = false;
+        room.history = [];
+        break;
+      }
+      case 'backToLobby': {
+        // 房主主动结束当前对局回到大厅（游戏中或结束页都可用）
+        if (myId !== room.hostId) return;
+        if (room.phase === 'lobby') return;
+        const me = room.players.get(myId);
+        room.phase = 'lobby';
+        room.askerOrder = [];
+        room.currentAskerIdx = 0;
+        room.turnAsked = false;
+        for (const p of room.players.values()) {
+          p.target = null;
+          p.guessed = false;
+          p.alive = true;
+          p.assigneeId = null;
+          p.isSpectator = false; // 观众转正
+        }
+        room.history.push({
+          kind: 'system',
+          text: `房主${me ? '（' + me.name + '）' : ''}结束了本局，回到大厅`,
+          time: Date.now(),
+        });
+        pushStateToAll();
         break;
       }
       case 'submitTarget': {
@@ -367,6 +474,7 @@ wss.on('connection', (ws) => {
           p.guessed = false;
           p.alive = true;
           p.assigneeId = null;
+          p.isSpectator = false; // 观众在新一局自动转正
         }
         pushStateToAll();
         break;
@@ -397,19 +505,26 @@ wss.on('connection', (ws) => {
       return;
     }
 
-    // 游戏中有人退出 -> 结束当局回到大厅（保持简单）
+    // 游戏中有人退出
     if (room.phase !== 'lobby') {
-      room.phase = 'lobby';
-      room.askerOrder = [];
-      room.currentAskerIdx = 0;
-      room.turnAsked = false;
-      for (const p of room.players.values()) {
-        p.target = null;
-        p.guessed = false;
-        p.alive = true;
-        p.assigneeId = null;
+      // 观众离开不影响游戏
+      if (me.isSpectator) {
+        room.history.push({ kind: 'system', text: `观众 ${me.name} 离开了房间`, time: Date.now() });
+      } else {
+        // 正式玩家离开 -> 结束当局回到大厅
+        room.phase = 'lobby';
+        room.askerOrder = [];
+        room.currentAskerIdx = 0;
+        room.turnAsked = false;
+        for (const p of room.players.values()) {
+          p.target = null;
+          p.guessed = false;
+          p.alive = true;
+          p.assigneeId = null;
+          p.isSpectator = false; // 观众转正
+        }
+        room.history.push({ kind: 'system', text: `${me.name} 离开了房间，本局结束，回到大厅`, time: Date.now() });
       }
-      room.history.push({ kind: 'system', text: `${me.name} 离开了房间，本局结束，回到大厅`, time: Date.now() });
     }
     pushStateToAll();
   });
