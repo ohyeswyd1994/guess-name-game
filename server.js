@@ -10,7 +10,7 @@ const os = require('os');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
-const MIN_PLAYERS = 3;
+const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 6;
 
 const app = express();
