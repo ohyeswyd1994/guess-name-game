@@ -428,6 +428,34 @@ wss.on('connection', (ws) => {
         pushStateToAll();
         break;
       }
+      case 'surrender': {
+        // 玩家认输：标记为已猜中（仅自己阶段），跳出回合，进入观战
+        if (room.phase !== 'playing') return;
+        const me = room.players.get(myId);
+        if (!me || me.guessed || me.isSpectator) return;
+        me.guessed = true;
+        room.history.push({
+          kind: 'surrender',
+          playerId: myId,
+          playerName: me.name,
+          target: me.target,
+          time: Date.now(),
+        });
+        // 如果当前提问者就是认输者，跳到下一位
+        if (room.askerOrder[room.currentAskerIdx] === myId) {
+          nextAsker();
+        }
+        // 检查是否全部猜中/认输
+        const allDone = [...room.players.values()]
+          .filter(p => !p.isSpectator)
+          .every(p => p.guessed);
+        if (allDone) {
+          room.phase = 'ended';
+          room.turnAsked = false;
+        }
+        pushStateToAll();
+        break;
+      }
       case 'guess': {
         if (room.phase !== 'playing') return;
         const me = room.players.get(myId);

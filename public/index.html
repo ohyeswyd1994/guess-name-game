@@ -159,6 +159,25 @@
     padding: 8px 12px;
   }
 
+  /* 认输按钮 */
+  .surrender-btn {
+    background: transparent;
+    color: #f87171;
+    border: 1px dashed #b91c1c;
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .surrender-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    color: #fca5a5;
+    border-style: solid;
+  }
+
   .target-board {
     background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
     color: white;
@@ -759,27 +778,51 @@ function connect() {
     } else if (msg.type === 'info') {
       showToast(msg.message, 4500);
     } else if (msg.type === 'kicked') {
-      kickedReason = msg.message || '你被移出了房间';
+      kickedReason = { kind: 'kicked', message: msg.message || '你被移出了房间' };
       // 服务端会主动 close 连接
     } else if (msg.type === 'disbanded') {
-      kickedReason = msg.message || '房间已解散';
+      kickedReason = { kind: 'disbanded', message: msg.message || '房间已解散' };
     }
   };
   ws.onclose = () => {
     if (kickedReason) {
-      // 显示离开提示页面，不自动重连
-      document.getElementById('main').innerHTML = `
-        <div class="card center">
-          <h3 style="margin-bottom:12px;">👋 ${escapeHtml(kickedReason)}</h3>
-          <p class="muted" style="margin-bottom:16px;">如想重新加入，请刷新页面</p>
-          <button onclick="location.reload()">刷新页面重新加入</button>
-        </div>
-      `;
+      showLeftRoomScreen(kickedReason);
       return;
     }
     showToast('与服务器断开连接，3 秒后重连…');
     setTimeout(() => location.reload(), 3000);
   };
+}
+
+function showLeftRoomScreen(reason) {
+  // 关掉聊天浮窗
+  const chatRoot = document.getElementById('chat-root');
+  if (chatRoot) chatRoot.innerHTML = '';
+
+  const isDisband = reason.kind === 'disbanded';
+  const emoji = isDisband ? '🏠' : '👋';
+  const title = isDisband ? '房间已解散' : '你已离开房间';
+  const subtitle = isDisband
+    ? '房主解散了房间，请刷新页面后重新加入'
+    : escapeHtml(reason.message);
+
+  // 大弹窗（不可点击关闭，因为连接已断）
+  const overlay = document.createElement('div');
+  overlay.className = 'splash-overlay with-bg';
+  overlay.style.zIndex = '9999';
+  overlay.innerHTML = `
+    <div class="splash-card lose" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+      <span class="splash-emoji">${emoji}</span>
+      <div class="splash-title">${escapeHtml(title)}</div>
+      <div class="splash-sub" style="margin-bottom:18px;">${subtitle}</div>
+      <button id="reloadAfterLeave" style="background:white;color:#6366f1;font-weight:700;padding:10px 28px;font-size:15px;border-radius:10px;border:none;cursor:pointer;">刷新页面</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById('reloadAfterLeave').onclick = () => location.reload();
+  // 同时把 main 区域也清掉（防止背后还看见旧界面）
+  const main = document.getElementById('main');
+  if (main) main.innerHTML = '';
 }
 
 function send(obj) {
@@ -1254,6 +1297,9 @@ function renderPlaying() {
           <div class="muted" style="margin-top:6px;font-size:12px;">${voteSummary(currentTurnQ)} · 观众无法参与投票</div>
         </div>
       ` : ''}
+      ${!youAreSpectator && me && !me.guessed ? `
+        <button id="surrenderBtn" class="ghost" style="margin-top:10px;width:100%;color:#f87171;border-color:#7f1d1d;">🏳️ 我认输了，告诉我答案吧</button>
+      ` : ''}
     </div>
 
     <div class="card">
@@ -1338,6 +1384,13 @@ function renderPlaying() {
       }
     });
   });
+
+  // 认输按钮
+  const surrenderBtn = document.getElementById('surrenderBtn');
+  if (surrenderBtn) surrenderBtn.onclick = () => {
+    if (!confirm('确定认输吗？\n\n你额头上的人名会被公开，然后进入观战。')) return;
+    send({ type: 'surrender' });
+  };
 
   if (isHost) bindHostActions();
   bindKickButtons();
@@ -1441,6 +1494,17 @@ function renderHistoryItem(h) {
       </div>
     `;
   }
+  if (h.kind === 'surrender') {
+    return `
+      <div class="question-card guess wrong">
+        <div class="head">
+          <span><b>${escapeHtml(h.playerName)}</b> 认输了 🏳️</span>
+          <span>${formatTime(h.time)}</span>
+        </div>
+        <div class="text">正确答案是：<b>${escapeHtml(h.target || '')}</b></div>
+      </div>
+    `;
+  }
   if (h.kind === 'system') {
     return `<div class="question-card system"><div class="text">${escapeHtml(h.text)}</div></div>`;
   }
@@ -1456,6 +1520,7 @@ function nameOf(id) {
 function historyBelongsToPlayer(h, playerId) {
   if (h.kind === 'question') return h.askerId === playerId;
   if (h.kind === 'guess') return h.playerId === playerId;
+  if (h.kind === 'surrender') return h.playerId === playerId;
   return false;
 }
 
@@ -1518,15 +1583,23 @@ function renderEnded() {
     <div class="card">
       <h3>📋 结果</h3>
       <div class="grid">
-        ${state.players.filter(p => !p.isSpectator).map(p => `
-          <div class="player-row">
-            <span class="name">${escapeHtml(p.name)}${p.id === myId ? ' (你)' : ''}</span>
-            <span class="tags">
-              <span class="badge">额头：${escapeHtml(p.id === myId ? (state.yourTarget || '') : (state.viewTargets.find(v=>v.id===p.id)?.target || ''))}</span>
-              ${p.guessed ? '<span class="badge guessed">猜中</span>' : '<span class="badge">未猜中</span>'}
-            </span>
-          </div>
-        `).join('')}
+        ${state.players.filter(p => !p.isSpectator).map(p => {
+          const surrenderRec = state.history.find(h => h.kind === 'surrender' && h.playerId === p.id);
+          const correctGuess = state.history.find(h => h.kind === 'guess' && h.playerId === p.id && h.correct);
+          let resultBadge;
+          if (correctGuess) resultBadge = '<span class="badge guessed">猜中</span>';
+          else if (surrenderRec) resultBadge = '<span class="badge" style="background:#7f1d1d;color:white;">认输</span>';
+          else resultBadge = '<span class="badge">未猜中</span>';
+          return `
+            <div class="player-row">
+              <span class="name">${escapeHtml(p.name)}${p.id === myId ? ' (你)' : ''}</span>
+              <span class="tags">
+                <span class="badge">额头：${escapeHtml(p.id === myId ? (state.yourTarget || '') : (state.viewTargets.find(v=>v.id===p.id)?.target || ''))}</span>
+                ${resultBadge}
+              </span>
+            </div>
+          `;
+        }).join('')}
       </div>
       ${state.players.some(p => p.isSpectator) ? `
         <p class="muted" style="margin-top:10px;font-size:12px;">观众：${state.players.filter(p => p.isSpectator).map(p => escapeHtml(p.name)).join('、')}</p>
