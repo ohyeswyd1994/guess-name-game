@@ -238,6 +238,49 @@
   .vote-buttons .maybe { background: var(--warn); color: #1e293b; }
   .vote-buttons .both { background: #8b5cf6; }
 
+  /* 投票选项（带评论输入框） */
+  .vote-options {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .vote-option-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .vote-option-row .vote-comment {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    min-width: 0;
+  }
+  .vote-option-row button {
+    min-width: 110px;
+    padding: 8px 14px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .vote-option-row .yes { background: var(--success); }
+  .vote-option-row .no { background: var(--danger); }
+  .vote-option-row .maybe { background: var(--warn); color: #1e293b; }
+  .vote-option-row .both { background: #8b5cf6; }
+  .vote-option.active .vote-comment {
+    border-color: var(--primary2);
+  }
+  .vote-comment-bubble {
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    font-style: italic;
+    color: var(--text);
+  }
+
   .quick-questions {
     display: flex;
     flex-wrap: wrap;
@@ -345,6 +388,156 @@
   @keyframes slideIn {
     from { opacity: 0; transform: translate(-50%, -10px); }
     to { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  /* ===== 聊天栏 ===== */
+  .chat-fab {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+    z-index: 90;
+    box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .chat-fab:hover { transform: scale(1.06); box-shadow: 0 10px 28px rgba(99,102,241,0.55); }
+  .chat-fab:active { transform: scale(0.96); }
+  .chat-fab .chat-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: var(--danger);
+    color: white;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  .chat-panel {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: min(360px, calc(100vw - 40px));
+    max-width: 360px;
+    height: min(480px, calc(100vh - 40px));
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    z-index: 91;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    overflow: hidden;
+    animation: chatOpen 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes chatOpen {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+    color: white;
+    font-weight: 600;
+  }
+  .chat-header button {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .chat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .chat-list::-webkit-scrollbar { width: 5px; }
+  .chat-list::-webkit-scrollbar-thumb { background: var(--card2); border-radius: 3px; }
+
+  .chat-msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+  }
+  .chat-msg.mine { align-self: flex-end; align-items: flex-end; }
+  .chat-msg .meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+    padding: 0 4px;
+  }
+  .chat-msg .meta .spectator-tag {
+    background: #6b7280;
+    color: white;
+    padding: 0 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    margin-left: 4px;
+  }
+  .chat-msg .bubble {
+    background: var(--bg);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+  .chat-msg.mine .bubble {
+    background: var(--primary);
+    color: white;
+  }
+  .chat-empty {
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    margin: auto;
+  }
+  .chat-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .chat-input-row input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .chat-input-row button {
+    padding: 8px 14px;
+    font-size: 13px;
   }
 
   /* ===== 猜中/猜错全屏弹窗 ===== */
@@ -518,6 +711,7 @@
   <div id="main"></div>
   <div class="footer-tip">在线游戏 · 2-6 人 · 房间唯一</div>
 </div>
+<div id="chat-root"></div>
 
 <script>
 const COMMON_QUESTIONS = [
@@ -536,6 +730,8 @@ let lastVoteChoice = {}; // questionId -> choice
 let kickedReason = null; // 被踢/解散后展示用
 let historyFilter = 'all'; // 'all' 或玩家 id
 let lastSeenGuessTime = 0; // 已展示过动画的最新猜测时间戳
+let chatOpen = false;
+let chatLastSeenTime = 0; // 已读的最后一条聊天时间戳
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -548,7 +744,13 @@ function connect() {
       try { localStorage.setItem('lastName', currentJoinName || ''); } catch {}
     } else if (msg.type === 'state') {
       const prevState = state;
+      const isFirstState = !prevState;
       state = msg.state;
+      // 首次收到 state 时，把已有聊天标记为已读
+      if (isFirstState) {
+        const chats = state.history.filter(h => h.kind === 'chat');
+        if (chats.length) chatLastSeenTime = chats[chats.length - 1].time;
+      }
       // 检测新增的猜测记录，弹动画
       maybeTriggerGuessAnimation(prevState);
       render();
@@ -719,10 +921,89 @@ function render() {
     historyFilter = 'all';
     lastPhase = state.phase;
   }
-  if (state.phase === 'lobby') return renderLobby();
-  if (state.phase === 'assigning') return renderAssigning();
-  if (state.phase === 'playing') return renderPlaying();
-  if (state.phase === 'ended') return renderEnded();
+  if (state.phase === 'lobby') renderLobby();
+  else if (state.phase === 'assigning') renderAssigning();
+  else if (state.phase === 'playing') renderPlaying();
+  else if (state.phase === 'ended') renderEnded();
+  // 不论哪个阶段，都把聊天浮窗渲染出来
+  renderChat();
+}
+
+// ========== 聊天栏 ==========
+function getChatMessages() {
+  if (!state || !state.history) return [];
+  return state.history.filter(h => h.kind === 'chat');
+}
+
+function renderChat() {
+  const root = document.getElementById('chat-root');
+  if (!root) return;
+  const msgs = getChatMessages();
+  // 未读数（最后一条聊天时间 > chatLastSeenTime 且不是自己发的）
+  const unread = chatOpen
+    ? 0
+    : msgs.filter(m => m.time > chatLastSeenTime && m.playerId !== myId).length;
+
+  if (chatOpen) {
+    // 打开聊天，更新已读标记
+    if (msgs.length > 0) chatLastSeenTime = msgs[msgs.length - 1].time;
+    root.innerHTML = `
+      <div class="chat-panel">
+        <div class="chat-header">
+          <span>💬 聊天 · ${msgs.length}</span>
+          <button id="chatClose" title="关闭">×</button>
+        </div>
+        <div class="chat-list" id="chatList">
+          ${msgs.length === 0 ? `<div class="chat-empty">还没有人说话，来打个招呼吧 👋</div>` : msgs.map(m => `
+            <div class="chat-msg ${m.playerId === myId ? 'mine' : ''}">
+              <div class="meta">
+                ${m.playerId === myId ? '你' : escapeHtml(m.playerName)}
+                ${m.isSpectator ? '<span class="spectator-tag">观众</span>' : ''}
+                · ${formatTime(m.time)}
+              </div>
+              <div class="bubble">${escapeHtml(m.text)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="chat-input-row">
+          <input id="chatInput" maxlength="200" placeholder="输入聊天内容…" />
+          <button id="chatSend">发送</button>
+        </div>
+      </div>
+    `;
+    // 滚动到底部
+    setTimeout(() => {
+      const list = document.getElementById('chatList');
+      if (list) list.scrollTop = list.scrollHeight;
+    }, 0);
+    // 绑定
+    document.getElementById('chatClose').onclick = () => { chatOpen = false; renderChat(); };
+    const inp = document.getElementById('chatInput');
+    if (inp) {
+      inp.focus();
+      const sendChat = () => {
+        const text = inp.value.trim();
+        if (!text) return;
+        send({ type: 'chat', text });
+        inp.value = '';
+      };
+      document.getElementById('chatSend').onclick = sendChat;
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+    }
+  } else {
+    // 折叠：显示一个圆形按钮
+    root.innerHTML = `
+      <button class="chat-fab" id="chatFab" title="打开聊天">
+        💬${unread > 0 ? `<span class="chat-badge">${unread > 99 ? '99+' : unread}</span>` : ''}
+      </button>
+    `;
+    document.getElementById('chatFab').onclick = () => {
+      chatOpen = true;
+      // 标记已读
+      if (msgs.length > 0) chatLastSeenTime = msgs[msgs.length - 1].time;
+      renderChat();
+    };
+  }
 }
 
 function playerListHtml() {
@@ -936,9 +1217,9 @@ function renderPlaying() {
       <div class="label">
         ${isMyTurn
           ? (turnAsked
-              ? '👉 你的回合 · 你已经问过了，现在请选择「猜」或「跳过」'
-              : '👉 你的回合 · 请提一个问题（每回合只能问 1 次）')
-          : `⌛ 当前轮到 <b>${asker ? escapeHtml(asker.name) : '—'}</b> 提问${turnAsked ? '（已问过，等他/她决定是否猜测）' : ''}`}
+              ? '👉 你的回合 · 你已经问过了，可以猜也可以跳过'
+              : '👉 你的回合 · 可以提问、直接猜、或跳过')
+          : `⌛ 当前轮到 <b>${asker ? escapeHtml(asker.name) : '—'}</b>${turnAsked ? '（已问过）' : ''}`}
       </div>
       ${isMyTurn ? `
         <div class="row" style="margin-top:8px;">
@@ -947,7 +1228,7 @@ function renderPlaying() {
         </div>
 
         <div style="margin-top:10px;">
-          <div class="muted" style="margin-bottom:6px;font-size:12px;">⚡ 常用问题（点一下直接发送）</div>
+          <div class="muted" style="margin-bottom:6px;font-size:12px;">⚡ 常用问题（点一下直接发送）${turnAsked ? '· 本回合已问过' : ''}</div>
           <div class="quick-questions">
             ${COMMON_QUESTIONS.map((q, i) => `
               <button class="quick-q" data-quick="${i}" ${turnAsked ? 'disabled' : ''}>${escapeHtml(q)}</button>
@@ -957,13 +1238,13 @@ function renderPlaying() {
 
         <div style="border-top:1px solid var(--border); margin:14px 0 10px;"></div>
 
-        <div class="muted" style="margin-bottom:8px;">${turnAsked ? '🎲 决定一下：' : '⚠️ 必须先问一个问题，才能选择猜测或跳过'}</div>
+        <div class="muted" style="margin-bottom:8px;">🎲 决定一下：</div>
         <div class="row" style="gap:8px;">
-          <input id="guessInput" maxlength="32" placeholder="${turnAsked ? '输入你认为自己额头上的人名' : '先提问后才能猜'}" ${turnAsked ? '' : 'disabled'} />
-          <button id="guessBtn" class="success" ${turnAsked ? '' : 'disabled'}>猜！</button>
+          <input id="guessInput" maxlength="32" placeholder="输入你认为自己额头上的人名" />
+          <button id="guessBtn" class="success">猜！</button>
         </div>
-        <button id="nextBtn" class="ghost" style="margin-top:10px;width:100%;" ${turnAsked ? '' : 'disabled'}>不猜了，跳过本回合 →</button>
-        ${turnAsked ? `<p class="muted" style="margin-top:8px;font-size:12px;">⚠️ 猜错的话本回合会立刻结束哦</p>` : ''}
+        <button id="nextBtn" class="ghost" style="margin-top:10px;width:100%;">不猜了，跳过本回合 →</button>
+        <p class="muted" style="margin-top:8px;font-size:12px;">⚠️ 猜错的话本回合会立刻结束哦</p>
       ` : ''}
       ${!isMyTurn && !youAreSpectator && currentTurnQ ? renderVoteUI(currentTurnQ, me) : ''}
       ${youAreSpectator && currentTurnQ ? `
@@ -1037,13 +1318,25 @@ function renderPlaying() {
     }
   }
 
-  // 投票绑定
+  // 投票绑定（带评论）
   document.querySelectorAll('[data-vote]').forEach(btn => {
     btn.onclick = () => {
       const choice = btn.getAttribute('data-vote');
       const qid = btn.getAttribute('data-qid');
-      send({ type: 'vote', choice, questionId: qid });
+      const inp = document.querySelector(`[data-vote-comment="${choice}"]`);
+      const comment = inp ? inp.value.trim() : '';
+      send({ type: 'vote', choice, questionId: qid, comment });
     };
+  });
+  // 输入框 Enter 也直接投票
+  document.querySelectorAll('[data-vote-comment]').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const choice = inp.getAttribute('data-vote-comment');
+        const btn = document.querySelector(`[data-vote="${choice}"]`);
+        if (btn) btn.click();
+      }
+    });
   });
 
   if (isHost) bindHostActions();
@@ -1051,18 +1344,50 @@ function renderPlaying() {
   bindHistoryTabs();
 }
 
+// 统一的投票项归一化：兼容旧格式（string id）和新格式（{id, comment}）
+function normalizeVoteItem(item) {
+  if (typeof item === 'string') return { id: item, comment: '' };
+  return { id: item.id, comment: item.comment || '' };
+}
+function voteItemsOf(q, kind) {
+  return (q.votes[kind] || []).map(normalizeVoteItem);
+}
+function myVoteKind(q) {
+  const kinds = ['yes', 'no', 'maybe', 'both'];
+  return kinds.find(k => voteItemsOf(q, k).some(v => v.id === myId));
+}
+function myVoteComment(q, kind) {
+  const item = voteItemsOf(q, kind).find(v => v.id === myId);
+  return item ? item.comment : '';
+}
+
+const VOTE_OPTIONS = [
+  { key: 'yes',   icon: '✅', label: '是',       cls: 'yes',   activeOutline: 'white' },
+  { key: 'no',    icon: '❌', label: '否',       cls: 'no',    activeOutline: 'white' },
+  { key: 'both',  icon: '🌗', label: '是也不是', cls: 'both',  activeOutline: 'white' },
+  { key: 'maybe', icon: '🤷', label: '不确定',   cls: 'maybe', activeOutline: '#1e293b' },
+];
+
 function renderVoteUI(q, me) {
   if (!me) return '';
-  const myVote = ['yes','no','maybe','both'].find(k => q.votes[k].includes(myId));
+  const myKind = myVoteKind(q);
   return `
     <div style="margin-top:10px;">
       <div class="muted" style="margin-bottom:6px;">${escapeHtml(q.askerName)} 问：</div>
       <div style="font-size:16px; padding:10px; background:var(--bg); border-radius:8px;">${escapeHtml(q.text)}</div>
-      <div class="vote-buttons">
-        <button class="yes" data-vote="yes" data-qid="${q.questionId}" ${myVote==='yes'?'style="outline:3px solid white;"':''}>✅ 是</button>
-        <button class="no" data-vote="no" data-qid="${q.questionId}" ${myVote==='no'?'style="outline:3px solid white;"':''}>❌ 否</button>
-        <button class="both" data-vote="both" data-qid="${q.questionId}" ${myVote==='both'?'style="outline:3px solid white;"':''}>🌗 是也不是</button>
-        <button class="maybe" data-vote="maybe" data-qid="${q.questionId}" ${myVote==='maybe'?'style="outline:3px solid #1e293b;"':''}>🤷 不确定</button>
+      <div class="vote-options" data-qid="${q.questionId}">
+        ${VOTE_OPTIONS.map(opt => {
+          const active = myKind === opt.key;
+          const myComment = active ? myVoteComment(q, opt.key) : '';
+          return `
+            <div class="vote-option ${opt.cls} ${active ? 'active' : ''}">
+              <div class="vote-option-row">
+                <input type="text" class="vote-comment" data-vote-comment="${opt.key}" maxlength="80" placeholder="加一句备注（可选）" value="${escapeHtml(myComment)}" />
+                <button class="${opt.cls}" data-vote="${opt.key}" data-qid="${q.questionId}" ${active ? `style="outline:3px solid ${opt.activeOutline};"` : ''}>${opt.icon} ${opt.label}</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
       <div class="muted" style="margin-top:6px;font-size:12px;">${voteSummary(q)}</div>
     </div>
@@ -1070,17 +1395,25 @@ function renderVoteUI(q, me) {
 }
 
 function voteSummary(q) {
-  const y = q.votes.yes.length, n = q.votes.no.length, b = (q.votes.both || []).length, m = q.votes.maybe.length;
+  const y = voteItemsOf(q, 'yes').length;
+  const n = voteItemsOf(q, 'no').length;
+  const b = voteItemsOf(q, 'both').length;
+  const m = voteItemsOf(q, 'maybe').length;
   return `当前投票 · ✅ ${y} · ❌ ${n} · 🌗 ${b} · 🤷 ${m}`;
 }
 
 function renderHistoryItem(h) {
   if (h.kind === 'question') {
-    const yesNames = h.votes.yes.map(id => nameOf(id)).join('、') || '—';
-    const noNames = h.votes.no.map(id => nameOf(id)).join('、') || '—';
-    const bothVotes = h.votes.both || [];
-    const bothNames = bothVotes.map(id => nameOf(id)).join('、') || '—';
-    const maybeNames = h.votes.maybe.map(id => nameOf(id)).join('、') || '—';
+    const renderVoteList = (kind) => {
+      const items = voteItemsOf(h, kind);
+      if (items.length === 0) return '—';
+      return items.map(v => {
+        const name = nameOf(v.id);
+        return v.comment
+          ? `${escapeHtml(name)}<span class="vote-comment-bubble">"${escapeHtml(v.comment)}"</span>`
+          : escapeHtml(name);
+      }).join('、');
+    };
     return `
       <div class="question-card">
         <div class="head">
@@ -1089,10 +1422,10 @@ function renderHistoryItem(h) {
         </div>
         <div class="text">${escapeHtml(h.text)}</div>
         <div class="votes">
-          <span class="vote-tag yes">✅ ${h.votes.yes.length} (${escapeHtml(yesNames)})</span>
-          <span class="vote-tag no">❌ ${h.votes.no.length} (${escapeHtml(noNames)})</span>
-          <span class="vote-tag both">🌗 ${bothVotes.length} (${escapeHtml(bothNames)})</span>
-          <span class="vote-tag maybe">🤷 ${h.votes.maybe.length} (${escapeHtml(maybeNames)})</span>
+          <span class="vote-tag yes">✅ ${voteItemsOf(h,'yes').length} (${renderVoteList('yes')})</span>
+          <span class="vote-tag no">❌ ${voteItemsOf(h,'no').length} (${renderVoteList('no')})</span>
+          <span class="vote-tag both">🌗 ${voteItemsOf(h,'both').length} (${renderVoteList('both')})</span>
+          <span class="vote-tag maybe">🤷 ${voteItemsOf(h,'maybe').length} (${renderVoteList('maybe')})</span>
         </div>
       </div>
     `;

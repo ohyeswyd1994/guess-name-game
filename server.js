@@ -66,7 +66,7 @@ function publicState() {
     askerId: room.askerOrder[room.currentAskerIdx] || null,
     askerOrder: room.askerOrder,
     turnAsked: room.turnAsked,
-    history: room.history.slice(-50),
+    history: room.history.slice(-200),
   };
 }
 
@@ -255,6 +255,22 @@ wss.on('connection', (ws) => {
         pushStateToAll();
         break;
       }
+      case 'chat': {
+        const me = room.players.get(myId);
+        if (!me) return;
+        const text = (msg.text || '').toString().trim().slice(0, 200);
+        if (!text) return;
+        room.history.push({
+          kind: 'chat',
+          playerId: myId,
+          playerName: me.name,
+          isSpectator: !!me.isSpectator,
+          text,
+          time: Date.now(),
+        });
+        pushStateToAll();
+        break;
+      }
       case 'startGame': {
         if (myId !== room.hostId) return;
         startAssigning();
@@ -389,10 +405,12 @@ wss.on('connection', (ws) => {
         if (last.askerId === myId) return; // 提问者不能投票
         // 清除该人之前的投票
         for (const k of VOTE_KINDS) {
-          last.votes[k] = last.votes[k].filter(v => v !== myId);
+          last.votes[k] = last.votes[k].filter(v => (typeof v === 'string' ? v : v.id) !== myId);
         }
         if (VOTE_KINDS.includes(msg.choice)) {
-          last.votes[msg.choice].push(myId);
+          const comment = (msg.comment || '').toString().trim().slice(0, 80);
+          // 始终用对象格式 { id, comment }，便于前端统一处理
+          last.votes[msg.choice].push({ id: myId, comment });
         }
         pushStateToAll();
         break;
@@ -400,11 +418,6 @@ wss.on('connection', (ws) => {
       case 'nextAsker': {
         if (room.phase !== 'playing') return;
         if (room.askerOrder[room.currentAskerIdx] !== myId) return;
-        // 必须先问过至少一个问题，才能跳过/结束回合
-        if (!room.turnAsked) {
-          sendTo(myId, { type: 'error', message: '本回合还没提问，先问一个问题再决定要不要猜或跳过吧' });
-          return;
-        }
         const me = room.players.get(myId);
         room.history.push({
           kind: 'system',
@@ -422,11 +435,6 @@ wss.on('connection', (ws) => {
         // 只能在自己回合里猜
         if (room.askerOrder[room.currentAskerIdx] !== myId) {
           sendTo(myId, { type: 'error', message: '不在你的回合，无法猜测' });
-          return;
-        }
-        // 必须先问过至少一个问题
-        if (!room.turnAsked) {
-          sendTo(myId, { type: 'error', message: '本回合还没提问，请先问一个问题再猜' });
           return;
         }
         const guess = (msg.guess || '').toString().trim();
