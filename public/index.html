@@ -280,6 +280,54 @@
   .history-box::-webkit-scrollbar { width: 6px; }
   .history-box::-webkit-scrollbar-thumb { background: var(--card2); border-radius: 3px; }
 
+  .history-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .history-tab {
+    background: var(--bg);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .history-tab:hover {
+    background: var(--card2);
+    color: var(--text);
+    transform: none;
+  }
+  .history-tab.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .history-tab .tab-count {
+    background: rgba(255,255,255,0.15);
+    color: inherit;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .history-tab.active .tab-count {
+    background: rgba(255,255,255,0.3);
+  }
+  .history-tab:not(.active) .tab-count {
+    background: var(--card2);
+    color: var(--text-dim);
+  }
+
   .toast {
     position: fixed;
     top: 20px;
@@ -297,6 +345,152 @@
   @keyframes slideIn {
     from { opacity: 0; transform: translate(-50%, -10px); }
     to { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  /* ===== 猜中/猜错全屏弹窗 ===== */
+  .splash-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .splash-overlay.with-bg {
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    pointer-events: auto;
+    animation: fadeInBg 0.3s ease;
+  }
+  @keyframes fadeInBg {
+    from { opacity: 0; backdrop-filter: blur(0); }
+    to { opacity: 1; }
+  }
+
+  .splash-card {
+    text-align: center;
+    padding: 36px 48px;
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    max-width: 90vw;
+    pointer-events: auto;
+  }
+
+  .splash-card.win {
+    background: linear-gradient(135deg, #10b981 0%, #34d399 50%, #fbbf24 100%);
+    color: white;
+    animation: winPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .splash-card.lose {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    animation: loseShake 0.6s ease;
+  }
+  @keyframes winPop {
+    0% { transform: scale(0.3) rotate(-10deg); opacity: 0; }
+    60% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+    80% { transform: scale(0.95) rotate(-2deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+  @keyframes loseShake {
+    0%, 100% { transform: translateX(0) scale(1); opacity: 1; }
+    10% { transform: translateX(-20px) scale(1.05); }
+    20% { transform: translateX(20px) scale(1.05); }
+    30% { transform: translateX(-15px) scale(1.02); }
+    40% { transform: translateX(15px) scale(1.02); }
+    50% { transform: translateX(-8px) scale(1); }
+    60% { transform: translateX(8px) scale(1); }
+    70% { transform: translateX(-3px); }
+    80% { transform: translateX(3px); }
+  }
+
+  .splash-emoji {
+    font-size: 96px;
+    line-height: 1;
+    margin-bottom: 12px;
+    display: block;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+  }
+  .splash-card.win .splash-emoji {
+    animation: emojiSpin 1.2s ease;
+  }
+  .splash-card.lose .splash-emoji {
+    animation: emojiTilt 0.8s ease;
+  }
+  @keyframes emojiSpin {
+    0% { transform: rotate(0) scale(0.5); }
+    50% { transform: rotate(360deg) scale(1.3); }
+    100% { transform: rotate(720deg) scale(1); }
+  }
+  @keyframes emojiTilt {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-25deg); }
+    75% { transform: rotate(25deg); }
+  }
+
+  .splash-title {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .splash-sub {
+    font-size: 18px;
+    opacity: 0.95;
+    margin-bottom: 4px;
+  }
+  .splash-name {
+    font-size: 24px;
+    font-weight: 700;
+    margin-top: 8px;
+    padding: 6px 18px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  /* 红色闪屏（猜错时） */
+  .lose-flash {
+    position: fixed;
+    inset: 0;
+    background: rgba(239, 68, 68, 0.5);
+    z-index: 199;
+    pointer-events: none;
+    animation: loseFlash 0.5s ease;
+  }
+  @keyframes loseFlash {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* 礼花 */
+  .confetti {
+    position: fixed;
+    z-index: 198;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .confetti span {
+    position: absolute;
+    top: -20px;
+    width: 10px;
+    height: 14px;
+    border-radius: 2px;
+    animation: confettiFall linear forwards;
+  }
+  @keyframes confettiFall {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(110vh) rotate(720deg);
+      opacity: 0.2;
+    }
   }
 
   .footer-tip {
@@ -340,6 +534,8 @@ let myId = null;
 let state = null;
 let lastVoteChoice = {}; // questionId -> choice
 let kickedReason = null; // 被踢/解散后展示用
+let historyFilter = 'all'; // 'all' 或玩家 id
+let lastSeenGuessTime = 0; // 已展示过动画的最新猜测时间戳
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -351,7 +547,10 @@ function connect() {
       myId = msg.youId;
       try { localStorage.setItem('lastName', currentJoinName || ''); } catch {}
     } else if (msg.type === 'state') {
+      const prevState = state;
       state = msg.state;
+      // 检测新增的猜测记录，弹动画
+      maybeTriggerGuessAnimation(prevState);
       render();
     } else if (msg.type === 'error') {
       showToast(msg.message);
@@ -393,6 +592,94 @@ function showToast(msg, duration) {
   setTimeout(() => t.remove(), duration || 2500);
 }
 
+// 检测有新的 guess 记录就弹动画
+function maybeTriggerGuessAnimation(prevState) {
+  if (!state || !state.history) return;
+  const guesses = state.history.filter(h => h.kind === 'guess');
+  if (guesses.length === 0) return;
+  const newest = guesses[guesses.length - 1];
+  if (newest.time <= lastSeenGuessTime) return;
+  // 首次连接：把历史里所有已有 guess 视为已看过，不触发
+  if (lastSeenGuessTime === 0 && !prevState) {
+    lastSeenGuessTime = newest.time;
+    return;
+  }
+  lastSeenGuessTime = newest.time;
+  // 自己 vs 别人
+  const isMine = newest.playerId === myId;
+  showGuessSplash({
+    correct: !!newest.correct,
+    name: newest.playerName,
+    guess: newest.guess,
+    target: newest.target,
+    isMine,
+  });
+}
+
+function showGuessSplash({ correct, name, guess, target, isMine }) {
+  // 移除可能残留的旧动画
+  document.querySelectorAll('.splash-overlay, .lose-flash, .confetti').forEach(n => n.remove());
+
+  if (correct) {
+    // 礼花
+    spawnConfetti();
+    // 弹窗
+    const overlay = document.createElement('div');
+    overlay.className = 'splash-overlay with-bg';
+    overlay.innerHTML = `
+      <div class="splash-card win">
+        <span class="splash-emoji">🎉</span>
+        <div class="splash-title">${isMine ? '你猜中啦！' : '猜中啦！'}</div>
+        <div class="splash-sub">${isMine ? '太厉害了 👏' : escapeHtml(name) + ' 猜对了'}</div>
+        <div class="splash-name">${escapeHtml(guess)}</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = () => overlay.remove();
+    setTimeout(() => overlay.remove(), 3500);
+  } else {
+    // 红色闪屏
+    const flash = document.createElement('div');
+    flash.className = 'lose-flash';
+    document.body.appendChild(flash);
+    setTimeout(() => flash.remove(), 500);
+    // 摇头动画弹窗
+    const overlay = document.createElement('div');
+    overlay.className = 'splash-overlay with-bg';
+    overlay.innerHTML = `
+      <div class="splash-card lose">
+        <span class="splash-emoji">😅</span>
+        <div class="splash-title">${isMine ? '猜错了！' : '猜错啦'}</div>
+        <div class="splash-sub">${isMine ? '回合结束，下一位继续' : escapeHtml(name) + ' 没猜中'}</div>
+        <div class="splash-name">猜的是：${escapeHtml(guess)}</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.onclick = () => overlay.remove();
+    setTimeout(() => overlay.remove(), 3000);
+  }
+}
+
+function spawnConfetti() {
+  const colors = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa', '#fb923c', '#22d3ee'];
+  const wrap = document.createElement('div');
+  wrap.className = 'confetti';
+  const N = 80;
+  for (let i = 0; i < N; i++) {
+    const s = document.createElement('span');
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.background = colors[Math.floor(Math.random() * colors.length)];
+    s.style.animationDuration = (2 + Math.random() * 2) + 's';
+    s.style.animationDelay = (Math.random() * 0.5) + 's';
+    s.style.transform = `rotate(${Math.random() * 360}deg)`;
+    s.style.width = (6 + Math.random() * 8) + 'px';
+    s.style.height = (10 + Math.random() * 8) + 'px';
+    wrap.appendChild(s);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 4500);
+}
+
 let currentJoinName = '';
 
 function renderJoin() {
@@ -424,8 +711,14 @@ function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+let lastPhase = null;
 function render() {
   if (!myId || !state) return;
+  // 阶段切换时重置历史筛选
+  if (lastPhase !== state.phase) {
+    historyFilter = 'all';
+    lastPhase = state.phase;
+  }
   if (state.phase === 'lobby') return renderLobby();
   if (state.phase === 'assigning') return renderAssigning();
   if (state.phase === 'playing') return renderPlaying();
@@ -684,9 +977,7 @@ function renderPlaying() {
 
     <div class="card">
       <h3>📜 历史记录</h3>
-      <div class="history-box" id="historyBox">
-        ${[...state.history].reverse().map(h => renderHistoryItem(h)).join('') || '<p class="muted">暂无</p>'}
-      </div>
+      ${historySectionHtml()}
     </div>
 
     <div class="card">
@@ -757,6 +1048,7 @@ function renderPlaying() {
 
   if (isHost) bindHostActions();
   bindKickButtons();
+  bindHistoryTabs();
 }
 
 function renderVoteUI(q, me) {
@@ -827,6 +1119,54 @@ function nameOf(id) {
   return p ? p.name : '？';
 }
 
+// 判断某条历史记录是否与某个玩家相关
+function historyBelongsToPlayer(h, playerId) {
+  if (h.kind === 'question') return h.askerId === playerId;
+  if (h.kind === 'guess') return h.playerId === playerId;
+  return false;
+}
+
+// 渲染历史记录区（带 tab 切换）
+function historySectionHtml() {
+  // 排除观众，只为正式玩家提供 tab
+  const playerTabs = state.players.filter(p => !p.isSpectator);
+  // 如果当前选中的玩家已不在房间（被踢/掉线），重置为 all
+  if (historyFilter !== 'all' && !state.players.find(p => p.id === historyFilter)) {
+    historyFilter = 'all';
+  }
+  const filtered = historyFilter === 'all'
+    ? state.history
+    : state.history.filter(h => historyBelongsToPlayer(h, historyFilter) || h.kind === 'system');
+
+  // 计数（每个玩家相关的提问+猜测条数）
+  const countOf = id => state.history.filter(h => historyBelongsToPlayer(h, id)).length;
+
+  return `
+    <div class="history-tabs">
+      <button class="history-tab ${historyFilter === 'all' ? 'active' : ''}" data-htab="all">
+        全部 <span class="tab-count">${state.history.filter(h => h.kind !== 'system').length}</span>
+      </button>
+      ${playerTabs.map(p => `
+        <button class="history-tab ${historyFilter === p.id ? 'active' : ''}" data-htab="${p.id}">
+          ${escapeHtml(p.name)}${p.id === myId ? '(你)' : ''} <span class="tab-count">${countOf(p.id)}</span>
+        </button>
+      `).join('')}
+    </div>
+    <div class="history-box">
+      ${[...filtered].reverse().map(h => renderHistoryItem(h)).join('') || `<p class="muted">${historyFilter === 'all' ? '暂无' : '该玩家暂无记录'}</p>`}
+    </div>
+  `;
+}
+
+function bindHistoryTabs() {
+  document.querySelectorAll('[data-htab]').forEach(btn => {
+    btn.onclick = () => {
+      historyFilter = btn.getAttribute('data-htab');
+      render(); // 重新渲染整页
+    };
+  });
+}
+
 function formatTime(t) {
   const d = new Date(t);
   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
@@ -862,9 +1202,7 @@ function renderEnded() {
 
     <div class="card">
       <h3>📜 全场记录</h3>
-      <div class="history-box">
-        ${[...state.history].reverse().map(h => renderHistoryItem(h)).join('') || '<p class="muted">暂无</p>'}
-      </div>
+      ${historySectionHtml()}
     </div>
 
     ${isHost ? `
@@ -884,6 +1222,7 @@ function renderEnded() {
     document.getElementById('restartBtn').onclick = () => send({ type: 'restart' });
     bindHostActions();
   }
+  bindHistoryTabs();
 }
 
 renderJoin();
