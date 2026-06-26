@@ -957,6 +957,67 @@ function escapeHtml(s) {
 }
 
 let lastPhase = null;
+
+// 保存所有 input/textarea 的当前值与焦点信息（按 id / data-vote-comment 索引）
+function snapshotInputs() {
+  const snap = { values: {}, focusKey: null, selStart: null, selEnd: null };
+  document.querySelectorAll('input, textarea').forEach(el => {
+    const key = inputKeyOf(el);
+    if (!key) return;
+    snap.values[key] = el.value;
+    if (el === document.activeElement) {
+      snap.focusKey = key;
+      try {
+        snap.selStart = el.selectionStart;
+        snap.selEnd = el.selectionEnd;
+      } catch {}
+    }
+  });
+  return snap;
+}
+
+function restoreInputs(snap) {
+  if (!snap) return;
+  Object.keys(snap.values).forEach(key => {
+    const el = findInputByKey(key);
+    if (!el) return;
+    // 只在当前 DOM 里值是空的时才恢复（避免覆盖服务端推送过来的"已就位"等内容）
+    // 实际场景：刚 render 的输入框默认 value 是 HTML 里写的（占位/已保存值）
+    // 我们的输入框（提问/猜测/聊天/投票评论）默认都是空，所以直接恢复
+    if (el.value === '' && snap.values[key]) {
+      el.value = snap.values[key];
+    } else if (key.startsWith('vote-comment:')) {
+      // 投票评论：服务端可能已记录了我自己的评论，但用户正在改，以本地为准
+      el.value = snap.values[key];
+    }
+  });
+  // 恢复焦点
+  if (snap.focusKey) {
+    const el = findInputByKey(snap.focusKey);
+    if (el) {
+      el.focus();
+      try {
+        if (snap.selStart != null) el.setSelectionRange(snap.selStart, snap.selEnd);
+      } catch {}
+    }
+  }
+}
+
+function inputKeyOf(el) {
+  if (el.id) return 'id:' + el.id;
+  const vc = el.getAttribute('data-vote-comment');
+  if (vc) return 'vote-comment:' + vc;
+  return null;
+}
+
+function findInputByKey(key) {
+  if (key.startsWith('id:')) return document.getElementById(key.slice(3));
+  if (key.startsWith('vote-comment:')) {
+    return document.querySelector(`[data-vote-comment="${key.slice('vote-comment:'.length)}"]`);
+  }
+  return null;
+}
+
 function render() {
   if (!myId || !state) return;
   // 阶段切换时重置历史筛选
@@ -964,12 +1025,16 @@ function render() {
     historyFilter = 'all';
     lastPhase = state.phase;
   }
+  // 保护输入态：先记录所有输入框的内容和焦点
+  const snap = snapshotInputs();
   if (state.phase === 'lobby') renderLobby();
   else if (state.phase === 'assigning') renderAssigning();
   else if (state.phase === 'playing') renderPlaying();
   else if (state.phase === 'ended') renderEnded();
   // 不论哪个阶段，都把聊天浮窗渲染出来
   renderChat();
+  // 还原输入框内容和焦点
+  restoreInputs(snap);
 }
 
 // ========== 聊天栏 ==========
@@ -978,7 +1043,8 @@ function getChatMessages() {
   return state.history.filter(h => h.kind === 'chat');
 }
 
-function renderChat() {
+function renderChat(opts) {
+  const forceFocus = opts && opts.focus;
   const root = document.getElementById('chat-root');
   if (!root) return;
   const msgs = getChatMessages();
@@ -1023,7 +1089,8 @@ function renderChat() {
     document.getElementById('chatClose').onclick = () => { chatOpen = false; renderChat(); };
     const inp = document.getElementById('chatInput');
     if (inp) {
-      inp.focus();
+      // 只有用户主动打开聊天时才抢焦点，否则保持现有焦点不变
+      if (forceFocus) inp.focus();
       const sendChat = () => {
         const text = inp.value.trim();
         if (!text) return;
@@ -1044,7 +1111,7 @@ function renderChat() {
       chatOpen = true;
       // 标记已读
       if (msgs.length > 0) chatLastSeenTime = msgs[msgs.length - 1].time;
-      renderChat();
+      renderChat({ focus: true });
     };
   }
 }
@@ -1185,7 +1252,10 @@ function renderAssigning() {
 
   if (assignee && !submitted) {
     const inp = document.getElementById('targetInput');
-    inp.focus();
+    // 只在没有任何输入框获得焦点时才主动 focus（避免抢走用户的焦点）
+    if (document.activeElement === document.body || document.activeElement === null) {
+      inp.focus();
+    }
     const submit = () => {
       const target = inp.value.trim();
       if (!target) { showToast('请输入人名'); return; }
@@ -1322,7 +1392,10 @@ function renderPlaying() {
   if (isMyTurn) {
     const inp = document.getElementById('askInput');
     if (inp && !inp.disabled) {
-      inp.focus();
+      // 只在用户没有焦点时才 focus
+      if (document.activeElement === document.body || document.activeElement === null) {
+        inp.focus();
+      }
       const ask = () => {
         const text = inp.value.trim();
         if (!text) { showToast('请输入问题'); return; }
